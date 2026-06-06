@@ -6,6 +6,8 @@ Based on the technique described at [Plugin Solar Explained](https://pluginsolar
 
 > **Note:** This solution only works for the EcoFlow Stream series connected with a parallel cable.
 
+> **Warning:** Increasing the output power affects your electrical installation. Always ensure your wiring, connectors, and components are rated for the load. If in doubt, consult a qualified electrician before making changes.
+
 ## How it works
 
 The proxy runs on your computer and sits between the EcoFlow iPhone app and EcoFlow's cloud API:
