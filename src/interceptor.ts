@@ -22,6 +22,7 @@ function logBody(label: string, url: string, contentType: string | null, bytes: 
 }
 
 export async function handleInterceptedRequest(req: Request, targetUrl?: string): Promise<Response> {
+  const start = Date.now()
   const host = req.headers.get('host') ?? new URL(req.url).host
   const { pathname, search } = new URL(req.url)
   const url = targetUrl ?? `https://${host}${pathname}${search}`
@@ -30,9 +31,11 @@ export async function handleInterceptedRequest(req: Request, targetUrl?: string)
     logRequest('REQUEST HEADERS', url, JSON.stringify(Object.fromEntries(req.headers)))
   }
 
+  let requestBodySize = 0
   let body: BodyInit | undefined
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     const bytes = new Uint8Array(await req.arrayBuffer())
+    requestBodySize = bytes.length
     if (LOG_BODY && bytes.length) {
       logBody('REQUEST BODY', url, req.headers.get('content-type'), bytes)
     }
@@ -53,11 +56,10 @@ export async function handleInterceptedRequest(req: Request, targetUrl?: string)
   const responseHeaders = new Headers(res.headers)
   responseHeaders.delete('content-encoding')
 
+  const resBytes = new Uint8Array(await res.arrayBuffer())
   if (LOG_BODY) {
-    const bytes = new Uint8Array(await res.arrayBuffer())
-    logBody(`RESPONSE [${res.status}] BODY`, url, res.headers.get('content-type'), bytes)
-    return new Response(bytes, { status: res.status, headers: responseHeaders })
+    logBody(`RESPONSE [${res.status}] BODY`, url, res.headers.get('content-type'), resBytes)
   }
-
-  return new Response(res.body, { status: res.status, headers: responseHeaders })
+  logRequest(req.method, url, JSON.stringify({request:{size:requestBodySize},response:{size:resBytes.length},duration:Date.now()-start}))
+  return new Response(resBytes, { status: res.status, headers: responseHeaders })
 }

@@ -1,10 +1,12 @@
 const DEFAULT_INTERCEPT_HOSTS: string[] = [
-  'api-e.ecoflow.com',
+  'archive.ubuntu.com',
   'github.com',
   'gitlab.com',
   'httpbin.org',
+  'ports.ubuntu.com',
   'registry.yarnpkg.com',
   'rubygems.org',
+  'security.ubuntu.com',
 ]
 
 export const INTERCEPT_HOSTS: string[] = Deno.env.get('INTERCEPT_HOSTS')

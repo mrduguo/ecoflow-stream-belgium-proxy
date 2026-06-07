@@ -5,7 +5,7 @@ A generic HTTPS MITM (man-in-the-middle) debug proxy. Routes traffic from any de
 ## How it works
 
 ```
-Device (WiFi proxy → computer:3128)
+Device (proxy → computer:3128)
   └─ CONNECT <intercepted-host>:443
        └─ redirected → localhost:3129 (HTTPS server)
             └─ logged → forwarded to real host
@@ -20,7 +20,7 @@ The proxy intercepts only the hosts listed in `src/hosts.ts`. All other traffic 
   curl -fsSL https://deno.land/install.sh | sh
   ```
 - `openssl` (pre-installed on macOS/Linux)
-- Device and computer on the **same WiFi network**
+- Device and computer on the **same network**
 
 ## Setup
 
@@ -46,7 +46,8 @@ On startup the proxy generates a fresh server certificate (signed by your CA, co
 Generating server certificate...
 Server certificate ready.
 CONNECT proxy listening on :3128
-Set device WiFi proxy → <your-ip>:3128
+Set device proxy → <your-ip>:3128
+Proxy auto-config (PAC) → http://<your-ip>:3128/proxy.pac
 Install CA cert → open in device browser: http://<your-ip>:3128/ca.crt
 ```
 
@@ -68,10 +69,23 @@ This adds the cert to the System keychain and marks it as a trusted root CA in o
 
 Step 4 is required — without it the cert is installed but not trusted.
 
-### 4. Set the WiFi proxy on your device
+### 4. Set the proxy on your device
 
-**iPhone / iPad:** Settings → Wi-Fi → your network → HTTP Proxy → Manual  
-Server: `<your-ip>` (printed on startup) · Port: `3128`
+Two options — PAC is easier as it needs no manual IP/port entry and works across networks:
+
+**Option A — Proxy Auto-Config (PAC)** *(recommended)*
+
+| Device | Path |
+|--------|------|
+| iPhone / iPad | Settings → Wi-Fi → your network → Configure Proxy → **Automatic** → URL: `http://<your-ip>:3128/proxy.pac` |
+| macOS | System Settings → Network → [interface] → Details → Proxies → **Automatic Proxy Configuration** → URL: `http://<your-ip>:3128/proxy.pac` |
+
+**Option B — Manual**
+
+| Device | Path |
+|--------|------|
+| iPhone / iPad | Settings → Wi-Fi → your network → Configure Proxy → **Manual** → Server: `<your-ip>` · Port: `3128` |
+| macOS | System Settings → Network → [interface] → Details → Proxies → **Web Proxy (HTTP)** and **Secure Web Proxy (HTTPS)** → `<your-ip>:3128` |
 
 ### 5. Watch the log
 
@@ -83,8 +97,10 @@ tail -f tmp/http-request.log
 
 Remove the proxy and certificate when done:
 
-**iPhone:** Settings → Wi-Fi → your network → HTTP Proxy → Off  
+**iPhone:** Settings → Wi-Fi → your network → Configure Proxy → Off (or clear the PAC URL)  
 Settings → General → VPN & Device Management → remove the profile
+
+**macOS:** System Settings → Network → [interface] → Details → Proxies → uncheck the proxy options and clear the PAC URL
 
 ## Testing
 

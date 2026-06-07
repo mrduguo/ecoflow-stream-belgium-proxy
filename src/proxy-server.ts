@@ -13,7 +13,6 @@ function findHeaderEnd(buf: Uint8Array, n: number): number {
 }
 
 async function handleHttpRequest(conn: Deno.TcpConn, method: string, targetUrl: string, buf: Uint8Array, n: number): Promise<void> {
-  const url = new URL(targetUrl)
   const headerEnd = findHeaderEnd(buf, n)
   const headerSection = new TextDecoder().decode(buf.subarray(0, headerEnd >= 0 ? headerEnd : n))
 
@@ -39,19 +38,10 @@ async function handleHttpRequest(conn: Deno.TcpConn, method: string, targetUrl: 
     }
   }
 
-  logRequest(method, targetUrl)
-
   const body = bodyBytes ? bodyBytes.buffer as ArrayBuffer : undefined
   const req = new Request(targetUrl, { method, headers, body })
 
-  let res: Response
-  if (INTERCEPT_HOSTS.includes(url.hostname)) {
-    res = await handleInterceptedRequest(req, targetUrl)
-  } else {
-    const forwardHeaders = new Headers(headers)
-    forwardHeaders.set('host', url.hostname)
-    res = await fetch(targetUrl, { method, headers: forwardHeaders, body })
-  }
+  const res = await handleInterceptedRequest(req, targetUrl)
 
   const resBody = new Uint8Array(await res.arrayBuffer())
   const resLines = [`HTTP/1.1 ${res.status} ${res.statusText || 'OK'}`]
@@ -67,10 +57,18 @@ async function handleHttpRequest(conn: Deno.TcpConn, method: string, targetUrl: 
   conn.close()
 }
 
-async function handleConnection(conn: Deno.TcpConn): Promise<void> {
+async function handleConnection(conn: Deno.TcpConn, port: number, ip: string): Promise<void> {
   const buf = new Uint8Array(65536)
   const n = await conn.read(buf)
   if (!n) { conn.close(); return }
+
+  // TLS ClientHello starts with 0x16 0x03 — reject non-HTTP connections early
+  if (buf[0] === 0x16 && buf[1] === 0x03) {
+    logRequest('TLS 400', conn.remoteAddr ? (conn.remoteAddr as Deno.NetAddr).hostname : 'unknown', 'direct TLS connection to HTTP proxy port')
+    await conn.write(enc.encode('HTTP/1.1 400 Bad Request\r\n\r\n'))
+    conn.close()
+    return
+  }
 
   const text = new TextDecoder().decode(buf.subarray(0, n))
   const [method, uri] = text.split('\r\n')[0].split(' ')
@@ -86,6 +84,19 @@ async function handleConnection(conn: Deno.TcpConn): Promise<void> {
         '', '',
       ].join('\r\n')))
       await conn.write(cert)
+      conn.close()
+      return
+    }
+    if (uri === '/proxy.pac') {
+      logRequest('GET', uri)
+      const pac = enc.encode(`function FindProxyForURL(url, host) { return "PROXY ${ip}:${port}"; }\n`)
+      await conn.write(enc.encode([
+        'HTTP/1.1 200 OK',
+        'Content-Type: application/x-ns-proxy-autoconfig',
+        `Content-Length: ${pac.length}`,
+        '', '',
+      ].join('\r\n')))
+      await conn.write(pac)
       conn.close()
       return
     }
@@ -113,13 +124,13 @@ async function handleConnection(conn: Deno.TcpConn): Promise<void> {
 
   const colonIdx = uri.lastIndexOf(':')
   const host = uri.slice(0, colonIdx)
-  const port = Number(uri.slice(colonIdx + 1))
+  const connectPort = Number(uri.slice(colonIdx + 1))
 
   logRequest('CONNECT', uri)
 
   const intercept = INTERCEPT_HOSTS.includes(host)
   const targetHost = intercept ? '127.0.0.1' : host
-  const targetPort = intercept ? INTERCEPT_PORT : port
+  const targetPort = intercept ? INTERCEPT_PORT : connectPort
 
   if (intercept) {
     console.log(`Intercepting ${uri} → localhost:${INTERCEPT_PORT}`)
@@ -133,10 +144,10 @@ async function handleConnection(conn: Deno.TcpConn): Promise<void> {
   await conn.write(enc.encode('HTTP/1.1 200 Connection Established\r\n\r\n'))
 }
 
-export async function startTunnel(port = 3128): Promise<void> {
+export async function startProxyServer(port: number, ip: string): Promise<void> {
   const listener = Deno.listen({ port, hostname: '0.0.0.0' })
   console.log(`CONNECT proxy listening on :${port}`)
   for await (const conn of listener) {
-    handleConnection(conn).catch(() => { try { conn.close() } catch { /* ignore */ } })
+    handleConnection(conn, port, ip).catch(() => { try { conn.close() } catch { /* ignore */ } })
   }
 }
