@@ -1,1 +1,3 @@
-http-request.log
+tmp/
+certificates/cert.pem
+certificates/key.pem

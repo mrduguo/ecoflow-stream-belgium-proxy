@@ -1,4 +1,4 @@
-const LOG_FILE = './http-request.log'
+const LOG_FILE = './tmp/http-request.log'
 const enc = new TextEncoder()
 
 export function logRequest(method: string, url: string, note = '') {
