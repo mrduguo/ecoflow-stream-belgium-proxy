@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "dev",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "deno task dev",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "debug",
+      "args": [],
+      "program": "src/index.ts",
+      "env": {
+        // "PROXY_PORT": "3128",
+      },
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${env:HOME}/.deno/bin/deno",
+      "runtimeArgs": [
+        "run",
+        "--inspect-wait",
+        "--allow-all"
+      ],
+      "attachSimplePort": 0,
+      "killBehavior": "polite",
+      "console": "integratedTerminal"
+    }
+  ]
+}

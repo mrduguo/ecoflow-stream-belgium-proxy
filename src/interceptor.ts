@@ -61,5 +61,6 @@ export async function handleInterceptedRequest(req: Request, targetUrl?: string)
     logBody(`RESPONSE [${res.status}] BODY`, url, res.headers.get('content-type'), resBytes)
   }
   logRequest(req.method, url, JSON.stringify({request:{size:requestBodySize},response:{size:resBytes.length},duration:Date.now()-start}))
-  return new Response(resBytes, { status: res.status, headers: responseHeaders })
+  const nullBodyStatus = res.status === 101 || res.status === 204 || res.status === 205 || res.status === 304
+  return new Response(nullBodyStatus ? null : resBytes, { status: res.status, headers: responseHeaders })
 }

@@ -40,9 +40,11 @@ export const INTERCEPT_HOSTS: string[] = [
 deno task start
 ```
 
-On startup the proxy generates a fresh server certificate (signed by your CA, covering all hosts in `hosts.ts`), then prints:
+On first startup the proxy generates a CA (if `certificates/ca.crt` is missing), then generates a fresh server certificate (signed by that CA, covering all hosts in `hosts.ts`), and prints:
 
 ```
+CA certificate not found, generating...
+CA certificate ready — install certificates/ca.crt on your device.
 Generating server certificate...
 Server certificate ready.
 CONNECT proxy listening on :3128
@@ -89,8 +91,10 @@ Two options — PAC is easier as it needs no manual IP/port entry and works acro
 
 ### 5. Watch the log
 
+Traffic is logged to the console. When started with `deno task start` (background), the output is captured in `tmp/proxy.log`:
+
 ```sh
-tail -f tmp/http-request.log
+tail -f tmp/proxy.log
 ```
 
 ### 6. Restore your device
@@ -116,7 +120,7 @@ curl -x http://127.0.0.1:3128 http://httpbin.org/get
 curl -x http://127.0.0.1:3128 https://httpbin.org/get --cacert certificates/ca.crt
 ```
 
-Both requests are logged to `tmp/http-request.log`.
+Both requests show up in the traffic log.
 
 ## Logging options
 
@@ -132,17 +136,17 @@ LOG_BODY=true deno task start
 ## Troubleshooting
 
 **CA certificate expired or needs regenerating**  
-The CA cert is valid for 10 years. To regenerate:
+The CA cert is valid for 10 years and is generated automatically on first start. To regenerate, delete the existing CA and restart:
 ```sh
-chmod +x bin/generate-ca.sh && ./bin/generate-ca.sh
+rm certificates/ca.crt certificates/ca.key && deno task start
 ```
-This writes `certificates/ca.crt` and `certificates/ca.key`. Reinstall the new CA cert on your device after regenerating.
+This writes a fresh `certificates/ca.crt` and `certificates/ca.key`. Reinstall the new CA cert on your device after regenerating.
 
 **"Connection is not private"**  
 The CA cert is not fully trusted — make sure you completed the Certificate Trust Settings step. Server certs are regenerated on every startup, so cert expiry is not normally a concern.
 
 **Traffic not being intercepted**  
-Check `http-request.log` for `CONNECT` lines — if the hostname doesn't match what's in `src/hosts.ts`, add it and restart.
+Check the traffic log for `CONNECT` lines — if the hostname doesn't match what's in `src/hosts.ts`, add it and restart.
 
 **Different host than expected**  
 Watch the `CONNECT` lines on first app launch to discover the actual hostname your app is connecting to.
