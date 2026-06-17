@@ -5,7 +5,8 @@ import { handleConfigRequest } from './proxy-endpoints.ts'
 
 const enc = new TextEncoder()
 
-async function handleConnection(conn: Deno.TcpConn, port: number, ip: string, interceptPort: number): Promise<void> {
+async function handleConnection(conn: Deno.TcpConn, port: number, ip: string): Promise<void> {
+  const interceptPort = port + 1
   const buf = new Uint8Array(65536)
   const n = await conn.read(buf)
   if (!n) { conn.close(); return }
@@ -67,10 +68,10 @@ async function handleConnection(conn: Deno.TcpConn, port: number, ip: string, in
   await conn.write(enc.encode('HTTP/1.1 200 Connection Established\r\n\r\n'))
 }
 
-export async function startProxyServer(port: number, ip: string, interceptPort: number): Promise<void> {
+export async function startProxyServer(port: number, ip: string): Promise<void> {
   const listener = Deno.listen({ port, hostname: '0.0.0.0' })
   console.log(`CONNECT proxy listening on :${port}`)
   for await (const conn of listener) {
-    handleConnection(conn, port, ip, interceptPort).catch(() => { try { conn.close() } catch { /* ignore */ } })
+    handleConnection(conn, port, ip).catch(() => { try { conn.close() } catch { /* ignore */ } })
   }
 }
