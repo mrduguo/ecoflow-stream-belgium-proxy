@@ -11,7 +11,22 @@ Device (proxy → computer:3128)
             └─ logged → forwarded to real host
 ```
 
-The proxy intercepts only the hosts listed in `src/hosts.ts`. All other traffic passes through unchanged as a standard CONNECT tunnel.
+The proxy intercepts hosts listed in `src/hosts.ts`, plus any host referenced by an `InterceptRequest` rule (see below). All other traffic passes through unchanged as a standard CONNECT tunnel.
+
+### Request modification rules
+
+`src/intercept-request.ts` defines the `InterceptRequest` interface, a request modification rule matches a `host` + `method` + `path` and rewrites the request body:
+
+```typescript
+export interface InterceptRequest {
+  host: string
+  method: string
+  path: string
+  modifyBody(body: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer>
+}
+```
+
+Rules are registered in `INTERCEPT_REQUESTS` in that same file. A rule's host is intercepted automatically, no need to also add it to `src/hosts.ts`. Matching requests are logged as `REQUEST` (original body) and `MODIFIED` (rewritten body).
 
 ## Prerequisites
 

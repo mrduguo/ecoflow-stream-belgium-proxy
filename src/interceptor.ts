@@ -1,4 +1,5 @@
 import { logRequest } from './log.ts'
+import { INTERCEPT_REQUESTS } from './intercept-request.ts'
 
 const LOG_HEADER = Deno.env.get('LOG_HEADER') === 'true'
 const LOG_BODY = Deno.env.get('LOG_BODY') === 'true'
@@ -34,11 +35,17 @@ export async function handleInterceptedRequest(req: Request, targetUrl?: string)
   let requestBodySize = 0
   let body: BodyInit | undefined
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    const bytes = new Uint8Array(await req.arrayBuffer())
-    requestBodySize = bytes.length
+    let bytes = new Uint8Array(await req.arrayBuffer())
     if (LOG_BODY && bytes.length) {
       logBody('REQUEST BODY', url, req.headers.get('content-type'), bytes)
     }
+    const rule = INTERCEPT_REQUESTS.find(r => r.host === host && r.method === req.method && r.path === pathname)
+    if (rule) {
+      logRequest('REQUEST', url, new TextDecoder().decode(bytes))
+      bytes = rule.modifyBody(bytes)
+      logRequest('MODIFIED', url, new TextDecoder().decode(bytes))
+    }
+    requestBodySize = bytes.length
     body = bytes
   }
 
@@ -46,6 +53,7 @@ export async function handleInterceptedRequest(req: Request, targetUrl?: string)
   forwardHeaders.set('host', host)
   if (!req.headers.has('accept-encoding')) forwardHeaders.delete('accept-encoding')
   if (!req.headers.has('accept-language')) forwardHeaders.delete('accept-language')
+  if (body) forwardHeaders.set('content-length', String((body as Uint8Array).length))
 
   const res = await fetch(url, { method: req.method, headers: forwardHeaders, body })
 
